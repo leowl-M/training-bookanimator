@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Book Animator</title>
+<link rel="icon" href="data:,">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: { neutral: { 850: '#1f1f1f', 950: '#0a0a0a' } }
+      }
+    }
+  }
+</script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script type="importmap">
+  { "imports": {
+    "three": "https://unpkg.com/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.170.0/examples/jsm/",
+    "mp4-muxer": "https://cdn.jsdelivr.net/npm/mp4-muxer@5.2.1/+esm"
+  } }
+</script>
+<link rel="stylesheet" href="style.css?v=studio-5">
+</head>
+<body class="bg-neutral-950 text-neutral-200 overflow-hidden text-sm font-sans flex flex-col md:flex-row h-screen antialiased selection:bg-neutral-700">
+<div id="localStart" hidden style="position:fixed;inset:0;z-index:1000;background:#171717;color:#e5e5e5;padding:12vh 10vw;font:16px/1.7 system-ui">
+  <h1>Apri Book Animator Studio</h1><p>Per usare il 3D e caricare i PDF, apri lo studio dall’anteprima locale.</p>
+  <a href="http://127.0.0.1:8080/app/" style="color:white;text-decoration:underline">Apri lo studio</a>
+  <p style="font-size:13px;color:#a3a3a3">Se l’anteprima non è disponibile, avvia il server dalla cartella del progetto seguendo il README.</p>
+</div>
+<script>if (location.protocol === 'file:') document.getElementById('localStart').hidden = false;</script>
+<nav class="md:hidden flex items-center justify-between px-4 py-3 border-b border-neutral-800 bg-[#171717]">
+  <button type="button" id="menuToggle" class="p-1.5 hover:bg-neutral-800 rounded-md flex items-center gap-1.5" aria-label="Prodotto"><i data-lucide="menu" class="w-5 h-5"></i><span class="text-xs">Prodotto</span></button>
+  <span class="font-semibold text-sm">Book Animator</span>
+  <span class="w-16"></span>
+</nav>
+
+<div id="sidebarOverlay" class="sidebar-overlay xl:hidden"></div>
+<form id="form" class="contents">
+<aside id="sidebar" class="w-80 flex-shrink-0 bg-[#171717] border-r border-neutral-800 flex flex-col h-full z-50 custom-scrollbar overflow-y-auto">
+  <div class="md:hidden flex items-center justify-between p-4 border-b border-neutral-800">
+    <h1 class="font-semibold">Prodotto</h1>
+    <button type="button" id="menuClose" class="p-2 hover:bg-neutral-800 rounded-md" aria-label="Chiudi"><i data-lucide="x" class="w-5 h-5"></i></button>
+  </div>
+  <div class="hidden md:flex items-center justify-between p-5 border-b border-neutral-800">
+    <h1 class="font-bold text-base">Book Animator</h1>
+    <span class="text-[10px] uppercase tracking-wider text-neutral-500">Prodotto</span>
+  </div>
+  <div class="flex-1 pb-10">
+    <details class="group border-b border-neutral-800" open>
+      <summary class="flex justify-between items-center px-5 py-3.5 cursor-pointer select-none font-medium hover:bg-neutral-800/50 transition-colors">
+        <span>Prodotto</span>
+        <i data-lucide="chevron-down" class="w-4 h-4 text-neutral-500 transition-transform group-open:-rotate-180"></i>
+      </summary>
+      <div class="px-5 pb-4 space-y-4">
+        <label class="field">Tipo
+          <select id="product">
+            <option value="hardcover">Libro cartonato</option>
+            <option value="paperback">Libro brossura</option>
+            <option value="magazine">Rivista / opuscolo (punto metallico)</option>
+            <option value="singer">Opuscolo cucitura singer</option>
+            <option value="spiral">Spirale wire-o</option>
+            <option value="exposed">Brossura filo refe a vista</option>
+            <option value="japanese">Rilegatura giapponese</option>
+            <option value="flyer">Flyer</option>
+            <option value="poster">Poster</option>
+            <option value="leaflet">Pieghevole</option>
+            <option value="card">Biglietto piegato</option>
+            <option value="crossfold">Pieghevole a croce</option>
+            <option value="vinyl">Vinile</option>
+            <option value="rollup">Roll-up banner</option>
+            <option value="flag">Bandiera</option>
+            <option value="bcard">Biglietti da visita</option>
+            <option value="envelope">Busta con lettera</option>
+            <option value="box">Scatola con coperchio</option>
+            <option value="bag">Shopper</option>
+          </select>
+        </label>
+        <label class="field" data-for="leaflet">Piega
+          <select id="fold" class="rb">
+            <option value="zigzag">A fisarmonica</option>
+            <option value="roll">A portafoglio</option>
+            <option value="gate">A finestra</option>
+          </select>
+        </label>
+        <label class="field" data-for="leaflet">Ante <input type="number" class="rb" id="panels" value="3" min="2" max="8"></label>
+        <label class="field" data-for="hardcover">Dorso
+          <select id="spineShape" class="rb">
+            <option value="round">Tondo</option>
+            <option value="flat">Quadro</option>
+          </select>
+        </label>
+        <label class="field" data-for="poster">Supporto
+          <select id="mount" class="rb">
+            <option value="none">Nessuno</option>
+            <option value="hanger">Listelli in legno</option>
+            <option value="frame">Cornice con vetro</option>
+            <option value="clips">Clip</option>
+          </select>
+        </label>
+        <label class="field">Carta
+          <select id="paper" class="rb">
+            <option value="gloss">Patinata lucida</option>
+            <option value="silk">Patinata opaca</option>
+            <option value="offset">Usomano</option>
+            <option value="bulky">Carta libro (vol.)</option>
+          </select>
+        </label>
+        <div class="space-y-1" data-for="flag">
+          <div class="flex justify-between items-center">
+            <label class="text-[10px] text-neutral-500" for="wind">Vento</label>
+            <span id="valWind" class="text-[10px] font-mono tabular-nums text-neutral-400">55%</span>
+          </div>
+          <input type="range" id="wind" min="0" max="100" value="55" class="w-full">
+        </div>
+      </div>
+    </details>
+
+    <details class="group border-b border-neutral-800" open>
+      <summary class="flex justify-between items-center px-5 py-3.5 cursor-pointer select-none font-medium hover:bg-neutral-800/50 transition-colors">
+        <span>Grafica</span>
+        <i data-lucide="chevron-down" class="w-4 h-4 text-neutral-500 transition-transform group-open:-rotate-180"></i>
+      </summary>
+      <div class="px-5 pb-4 space-y-4">
+        <div class="space-y-4" data-for="hardcover paperback magazine spiral exposed singer japanese">
+          <div class="space-y-1.5">
+            <label class="text-xs text-neutral-400" for="innerPdf">PDF pagine interne</label>
+            <input type="file" id="innerPdf" accept="application/pdf,.pdf">
+            <p class="status" id="innerStatus" role="status">Pagine singole in ordine di lettura. Due pagine = un foglio.</p>
+          </div>
+          <div class="space-y-1.5">
+            <label class="text-xs text-neutral-400" for="coverPdf">PDF copertina</label>
+            <input type="file" id="coverPdf" accept="application/pdf,.pdf">
+          </div>
+          <label class="field">Impaginazione copertina
+            <select id="coverMode">
+              <option value="auto">Automatica</option>
+              <option value="spread">Stesa (retro·dorso·fronte)</option>
+              <option value="separate">Pagine separate</option>
+              <option value="front">Solo fronte</option>
+            </select>
+          </label>
+          <label class="field">Abbondanza (mm) <input type="number" id="coverBleed" min="0" max="20" step="0.5" value="0"></label>
+          <p class="status" id="coverStatus" role="status">La stesa viene separata in retro, dorso e fronte usando il formato del libro.</p>
+          <p class="status">I PDF vengono elaborati sul tuo dispositivo.</p>
+        </div>
+        <details class="group/img">
+          <summary class="flex justify-between items-center cursor-pointer select-none text-xs text-neutral-400 hover:text-neutral-200 transition-colors">
+            <span>Carica immagini singole</span>
+            <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-neutral-500 transition-transform group-open/img:-rotate-180"></i>
+          </summary>
+          <div class="pt-3 space-y-3">
+            <div class="space-y-1.5"><label class="text-xs text-neutral-400" for="front" id="lFront">Copertina</label><input type="file" id="front" accept="image/*"></div>
+            <div class="space-y-1.5"><label class="text-xs text-neutral-400" for="back" id="lBack">Retro</label><input type="file" id="back" accept="image/*"></div>
+            <div class="space-y-1.5" data-for="hardcover paperback vinyl japanese"><label class="text-xs text-neutral-400" for="spine" id="lSpine">Dorso</label><input type="file" id="spine" accept="image/*"></div>
+            <div class="space-y-1.5" data-for="hardcover paperback magazine spiral exposed singer japanese"><label class="text-xs text-neutral-400" for="inner">Pagine interne</label><input type="file" id="inner" accept="image/*" multiple></div>
+          </div>
+        </details>
+      </div>
+    </details>
+
+    <details class="group border-b border-neutral-800" open>
+      <summary class="flex justify-between items-center px-5 py-3.5 cursor-pointer select-none font-medium hover:bg-neutral-800/50 transition-colors">
+        <span>Formato (mm)</span>
+        <i data-lucide="chevron-down" class="w-4 h-4 text-neutral-500 transition-transform group-open:-rotate-180"></i>
+      </summary>
+      <div class="px-5 pb-4 space-y-4">
+        <label class="field"><span id="lW">Larghezza</span> <input type="number" class="rb" id="w" value="150" min="10" step="0.1"></label>
+        <label class="field" data-for="box bag">Profondità <input type="number" class="rb" id="depth" value="120" min="10" step="1"></label>
+        <label class="field">Altezza <input type="number" class="rb" id="h" value="210" min="10" step="0.1"></label>
+        <label class="field" data-for="hardcover paperback magazine spiral exposed singer japanese" title="Calcolato da fogli, carta e copertine">Spessore totale <input type="number" id="t" value="5.9" step="0.01" readonly></label>
+        <label class="field" data-for="hardcover">Cartone <input type="number" class="rb" id="board" value="2.5" min="0.5" step="0.5"></label>
+        <label class="field" data-for="hardcover paperback magazine spiral exposed singer japanese">Fogli sfogliabili <input type="number" class="rb" id="sheets" value="6" min="0" max="1000"></label>
+      </div>
+    </details>
+
+    <details class="group border-b border-neutral-800" open>
+      <summary class="flex justify-between items-center px-5 py-3.5 cursor-pointer select-none font-medium hover:bg-neutral-800/50 transition-colors">
+        <span>Colori e materiali</span>
+        <i data-lucide="chevron-down" class="w-4 h-4 text-neutral-500 transition-transform group-open:-rotate-180"></i>
+      </summary>
+      <div class="px-5 pb-4 space-y-4">
+        <label class="field" data-for="hardcover">Tela copertina <input type="color" class="rb color-input" id="cBoard" value="#2b2b2b"></label>
+        <label class="field" data-for="spiral">Spirale <input type="color" class="rb color-input" id="cWire" value="#2a2a2c"></label>
+        <label class="field" data-for="exposed singer japanese">Filo <input type="color" class="rb color-input" id="cThread" value="#c8412f"></label>
+        <label class="field">Carta <input type="color" class="rb color-input" id="cPaper" value="#f6f3ec"></label>
+      </div>
+    </details>
+  </div>
+</aside>
+
+<main id="view" class="flex-1 min-w-0 min-h-0 flex flex-col bg-neutral-950 overflow-hidden relative">
+  <div class="flex items-center gap-1 px-3 py-2 border-b border-neutral-800 bg-[#171717]">
+    <button type="button" id="restart" class="tb" title="Ricomincia (R)" aria-label="Ricomincia (R)"><i data-lucide="rotate-ccw" class="w-4 h-4"></i></button>
+    <button type="button" id="pause" class="tb" title="Pausa (Spazio)" aria-label="Pausa (Spazio)"><i data-lucide="pause" class="w-4 h-4"></i></button>
+    <span class="w-px h-5 bg-neutral-800 mx-1"></span>
+    <span class="flex items-center gap-1" data-for="hardcover paperback magazine spiral exposed singer japanese"><button type="button" id="prevPage" class="tb" title="Pagina precedente (←)" aria-label="Pagina precedente (←)"><i data-lucide="chevron-left" class="w-4 h-4"></i></button><button type="button" id="nextPage" class="tb" title="Pagina successiva (→)" aria-label="Pagina successiva (→)"><i data-lucide="chevron-right" class="w-4 h-4"></i></button></span>
+    <span class="flex-1"></span>
+    <button type="button" id="tbFrame" class="tb" title="Reinquadra (F)" aria-label="Reinquadra (F)"><i data-lucide="scan" class="w-4 h-4"></i></button>
+    <button type="button" id="tbPng" class="tb" title="Salva PNG (P)" aria-label="Salva PNG (P)"><i data-lucide="image-down" class="w-4 h-4"></i></button>
+    <button type="button" id="tbRec" class="tb" title="Registra video (V)" aria-label="Registra video (V)"><i data-lucide="video" class="w-4 h-4"></i></button>
+    <span class="w-px h-5 bg-neutral-800 mx-1 xl:hidden"></span>
+    <button type="button" id="sceneToggle" class="tb xl:hidden flex items-center gap-1.5" title="Scena"><i data-lucide="sliders-horizontal" class="w-4 h-4"></i><span class="text-xs">Scena</span></button>
+  </div>
+  <div id="stage" class="flex-1 min-h-0 w-full flex items-center justify-center relative">
+    <div id="canvasWrap" class="relative shadow-2xl" style="outline: 1px solid #262626;"></div>
+  </div>
+  <div class="flex items-center gap-3 px-4 py-2.5 border-t border-neutral-800 bg-[#171717]">
+    <span id="timeReadout" class="text-[10px] font-mono tabular-nums text-neutral-400 w-20 flex-shrink-0">0.0 / 8.0 s</span>
+    <input type="range" id="timeline" min="0" max="1000" value="0" class="flex-1" aria-label="Tempo del video">
+    <span id="canvasCaption" class="hidden sm:inline text-[10px] font-mono tabular-nums tracking-wider text-neutral-500 flex-shrink-0">CANVAS 1080 × 1440 · 3:4</span>
+  </div>
+</main>
+
+<aside id="sidebarRight" class="w-80 flex-shrink-0 bg-[#171717] border-l border-neutral-800 flex flex-col h-full z-50 custom-scrollbar overflow-y-auto">
+  <div class="flex items-center justify-between px-5 py-4 border-b border-neutral-800">
+    <h2 class="font-bold text-base">Scena</h2>
+    <button type="button" id="sceneClose" class="xl:hidden p-2 hover:bg-neutral-800 rounded-md" aria-label="Chiudi"><i data-lucide="x" class="w-5 h-5"></i></button>
+  </div>
+  <div class="flex-1 pb-10">
+    <details class="group border-b border-neutral-800" open>
+      <summary class="flex justify-between items-center px-5 py-3.5 cursor-pointer select-none font-medium hover:bg-neutral-800/50 transition-colors">
+        <span>Animazioni pronte</span>
+        <i data-lucide="chevron-down" class="w-4 h-4 text-neutral-500 transition-transform group-open:-rotate-180"></i>
+      </summary>
+      <div class="px-5 pb-4 space-y-3">
+        <div id="presetGrid" class="grid grid-cols-2 gap-2"></div>
+        <p class="status">Imposta sfoglio, movimento e durata del video. Poi puoi modificarli qui sotto.</p>
+      </div>
+    </details>
+
+    <details class="group border-b border-neutral-800" open>
+      <summary class="flex justify-between items-center px-5 py-3.5 cursor-pointer select-none font-medium hover:bg-neutral-800/50 transition-colors">
+        <span>Animazione</span>
+        <i data-lucide="chevron-down" class="w-4 h-4 text-neutral-500 transition-transform group-open:-rotate-180"></i>
+      </summary>
+      <div class="px-5 pb-4 space-y-4">
+        <label class="field">Sfoglio
+          <select id="action">
+            <option value="static">No, pagina scelta</option>
+            <option value="flip" selected>Sfoglia tutto</option>
+            <option value="riffle">Sfoglio rapido</option>
+            <option value="middle">Apri al centro</option>
+            <option value="cover">Solo copertina</option>
+          </select>
+        </label>
+        <label class="field">Movimento
+          <select id="anim">
+            <option value="none" selected>Nessuno</option>
+            <optgroup label="Prodotto">
+              <option value="spin">Rotazione</option>
+              <option value="turntable">360° su piatto</option>
+              <option value="tilt">Tilt</option>
+              <option value="roll360">Capriola 360°</option>
+              <option value="whip">Giro rapido</option>
+              <option value="float">Sospensione</option>
+              <option value="tumble">Volteggio</option>
+              <option value="swing">Oscillazione</option>
+              <option value="flip">Fronte e retro</option>
+              <option value="drop">Caduta</option>
+              <option value="slide">Entrata laterale</option>
+              <option value="pop">Pop</option>
+              <option value="stopmotion">Stop-motion</option>
+            </optgroup>
+            <optgroup label="Camera">
+              <option value="orbit">Panoramica</option>
+              <option value="orbit360">Giro completo 360°</option>
+              <option value="tiltcam">Tilt camera</option>
+              <option value="spiralcam">Spirale</option>
+              <option value="kenburns">Ken Burns</option>
+              <option value="dolly">Carrellata</option>
+              <option value="push">Avvicinamento</option>
+              <option value="reveal">Rivelazione</option>
+              <option value="rise">Dall'alto</option>
+              <option value="hero">Dal basso</option>
+              <option value="topdown">Vista dall'alto</option>
+              <option value="handheld">Camera a mano</option>
+            </optgroup>
+            <optgroup label="Sequenze per video">
+              <option value="both">Presentazione</option>
+              <option value="showcase">Sequenza dinamica</option>
+            </optgroup>
+          </select>
+        </label>
+        <p class="status">Sfoglio e movimento si combinano. Il ciclo del movimento dura quanto il video.</p>
+        <div class="space-y-1">
+          <div class="flex justify-between items-center">
+            <label class="text-[10px] text-neutral-500" for="speed">Velocità</label>
+            <span id="valSpeed" class="text-[10px] font-mono tabular-nums text-neutral-400">1.0×</span>
+          </div>
+          <input type="range" id="speed" min="0.2" max="2" step="0.1" value="1" class="w-full">
+        </div>
+        <div class="space-y-1" data-for="hardcover paperback magazine leaflet card crossfold spiral exposed singer japanese">
+          <div class="flex justify-between items-center">
+            <label class="text-[10px] text-neutral-500" for="angle">Apertura</label>
+            <span id="valAngle" class="text-[10px] font-mono tabular-nums text-neutral-400">170°</span>
+          </div>
+          <input type="range" id="angle" min="0" max="180" value="170" class="w-full">
+        </div>
+        <div class="space-y-1" data-for="hardcover paperback magazine spiral exposed singer japanese">
+          <div class="flex justify-between items-center">
+            <label class="text-[10px] text-neutral-500" for="turned" title="0 = chiuso, 1 = copertina aperta, poi un foglio alla volta">Pagina aperta</label>
+            <span id="valTurned" class="text-[10px] font-mono tabular-nums text-neutral-400">0</span>
+          </div>
+          <input type="range" id="turned" min="0" max="7" value="0" class="w-full">
+        </div>
+        <div class="space-y-1" data-for="hardcover paperback magazine spiral exposed singer japanese">
+          <div class="flex justify-between items-center">
+            <label class="text-[10px] text-neutral-500" for="scrub" id="scrubLeaf">Punto dello sfoglio</label>
+            <span id="valScrub" class="text-[10px] font-mono tabular-nums text-neutral-400">0%</span>
+          </div>
+          <input type="range" id="scrub" min="0" max="100" value="0" class="w-full">
+        </div>
+      </div>
+    </details>
+
+    <details class="group border-b border-neutral-800" open>
+      <summary class="flex justify-between items-center px-5 py-3.5 cursor-pointer select-none font-medium hover:bg-neutral-800/50 transition-colors">
+        <span>Composizione e soggetto</span>
+        <i data-lucide="chevron-down" class="w-4 h-4 text-neutral-500 transition-transform group-open:-rotate-180"></i>
+      </summary>
+      <div class="px-5 pb-4 space-y-4">
+        <label class="field">Composizione
+          <select id="compose" class="rb">
+            <option value="single">Singolo</option>
+            <option value="pair">Coppia</option>
+            <option value="row">Fila di tre</option>
+            <option value="stack">Pila</option>
+            <option value="fan">Ventaglio</option>
+            <option value="back">Fronte e retro</option>
+            <option value="grid">Griglia</option>
+            <option value="scatter">Sparsi</option>
+            <option value="cascade">Cascata</option>
+            <option value="tower">Pila alta</option>
+            <option value="arc">Arco</option>
+          </select>
+        </label>
+        <div class="space-y-1">
+          <div class="flex justify-between items-center">
+            <label class="text-[10px] text-neutral-500" for="subjX">Posizione orizzontale</label>
+            <span id="valSubjX" class="text-[10px] font-mono tabular-nums text-neutral-400">0%</span>
+          </div>
+          <input type="range" id="subjX" min="-50" max="50" value="0" class="w-full">
+        </div>
+        <div class="space-y-1">
+          <div class="flex justify-between items-center">
+            <label class="text-[10px] text-neutral-500" for="subjY">Posizione verticale</label>
+            <span id="valSubjY" class="text-[10px] font-mono tabular-nums text-neutral-400">0%</span>
+          </div>
+          <input type="range" id="subjY" min="-50" max="50" value="0" class="w-full">
+        </div>
+        <div class="space-y-1">
+          <div class="flex justify-between items-center">
+            <label class="text-[10px] text-neutral-500" for="subjRot">Rotazione</label>
+            <span id="valSubjRot" class="text-[10px] font-mono tabular-nums text-neutral-400">0°</span>
+          </div>
+          <input type="range" id="subjRot" min="-180" max="180" value="0" class="w-full">
+        </div>
+        <div class="space-y-1">
+          <div class="flex justify-between items-center">
+            <label class="text-[10px] text-neutral-500" for="subjScale">Scala</label>
+            <span id="valSubjScale" class="text-[10px] font-mono tabular-nums text-neutral-400">100%</span>
+          </div>
+          <input type="range" id="subjScale" min="50" max="200" value="100" class="w-full">
+        </div>
+        <button type="button" id="subjReset" class="w-full flex items-center justify-center gap-2 border border-neutral-700 py-2 rounded-md hover:bg-neutral-800 transition-colors"><i data-lucide="rotate-ccw" class="w-4 h-4"></i>Ripristina</button>
+      </div>
+    </details>
+
+    <details class="group border-b border-neutral-800" open>
+      <summary class="flex justify-between items-center px-5 py-3.5 cursor-pointer select-none font-medium hover:bg-neutral-800/50 transition-colors">
+        <span>Camera</span>
+        <i data-lucide="chevron-down" class="w-4 h-4 text-neutral-500 transition-transform group-open:-rotate-180"></i>
+      </summary>
+      <div class="px-5 pb-4 space-y-4">
+        <label class="field">Inquadratura automatica <input type="checkbox" id="autoFrame" checked></label>
+        <div class="space-y-1">
+          <div class="flex justify-between items-center">
+            <label class="text-[10px] text-neutral-500" for="focal">Obiettivo</label>
+            <span id="valFocal" class="text-[10px] font-mono tabular-nums text-neutral-400">42 mm</span>
+          </div>
+          <input type="range" id="focal" min="18" max="135" value="42" class="w-full">
+        </div>
+        <button type="button" id="reframe" class="w-full flex items-center justify-center gap-2 border border-neutral-700 py-2 rounded-md hover:bg-neutral-800 transition-colors" title="Reinquadra (F)"><i data-lucide="scan" class="w-4 h-4"></i>Reinquadra</button>
+        <p class="status">Trascina sul canvas per girare la camera, rotellina per avvicinarti. Trascina una pagina per sfogliarla a mano.</p>
+      </div>
+    </details>
+
+    <details class="group border-b border-neutral-800">
+      <summary class="flex justify-between items-center px-5 py-3.5 cursor-pointer select-none font-medium hover:bg-neutral-800/50 transition-colors">
+        <span>Luce</span>
+        <i data-lucide="chevron-down" class="w-4 h-4 text-neutral-500 transition-transform group-open:-rotate-180"></i>
+      </summary>
+      <div class="px-5 pb-4 space-y-4">
+        <label class="field">Luce pronta
+          <select id="lightPreset">
+            <option value="custom">Personalizzata</option>
+            <option value="studio" selected>Studio</option>
+            <option value="window">Finestra</option>
+            <option value="blinds">Veneziana</option>
+            <option value="garden">Sotto gli alberi</option>
+            <option value="sunset">Tramonto</option>
+            <option value="noon">Mezzogiorno</option>
+            <option value="dramatic">Drammatica</option>
+          </select>
+        </label>
+        <div class="space-y-1">
+          <div class="flex justify-between items-center">
+            <label class="text-[10px] text-neutral-500" for="lightAz">Direzione della luce</label>
+            <span id="valLightAz" class="text-[10px] font-mono tabular-nums text-neutral-400">34°</span>
+          </div>
+          <input type="range" id="lightAz" min="0" max="360" value="34" class="w-full">
+        </div>
+        <div class="space-y-1">
+          <div class="flex justify-between items-center">
+            <label class="text-[10px] text-neutral-500" for="lightEl">Altezza della luce</label>
+            <span id="valLightEl" class="text-[10px] font-mono tabular-nums text-neutral-400">48°</span>
+          </div>
+          <input type="range" id="lightEl" min="10" max="85" value="48" class="w-full">
+        </div>
+        <div class="space-y-1">
+          <div class="flex justify-between items-center">
+            <label class="text-[10px] text-neutral-500" for="lightPow">Intensità della luce</label>
+            <span id="valLightPow" class="text-[10px] font-mono tabular-nums text-neutral-400">160%</span>
+          </div>
+          <input type="range" id="lightPow" min="0" max="300" value="160" class="w-full">
+        </div>
+        <div class="space-y-1">
+          <div class="flex justify-between items-center">
+            <label class="text-[10px] text-neutral-500" for="lightTemp">Temperatura colore</label>
+            <span id="valLightTemp" class="text-[10px] font-mono tabular-nums text-neutral-400">5600 K</span>
+          </div>
+          <input type="range" id="lightTemp" min="2500" max="9000" value="5600" step="100" class="w-full">
+        </div>
+        <div class="space-y-1">
+          <div class="flex justify-between items-center">
+            <label class="text-[10px] text-neutral-500" for="envPow">Luce ambiente</label>
+            <span id="valEnvPow" class="text-[10px] font-mono tabular-nums text-neutral-400">90%</span>
+          </div>
+          <input type="range" id="envPow" min="0" max="200" value="90" class="w-full">
+        </div>
+        <div class="space-y-1">
+          <div class="flex justify-between items-center">
+            <label class="text-[10px] text-neutral-500" for="shadowPow">Ombra sul piano</label>
+            <span id="valShadowPow" class="text-[10px] font-mono tabular-nums text-neutral-400">60%</span>
+          </div>
+          <input type="range" id="shadowPow" min="0" max="100" value="60" class="w-full">
+        </div>
+        <label class="field">Ombra proiettata
+          <select id="gobo">
+            <option value="none">Nessuna</option>
+            <option value="blinds">Veneziana</option>
+            <option value="window">Finestra</option>
+            <option value="leaves">Foglie</option>
+          </select>
+        </label>
+        <label class="field">Ombra in movimento <input type="checkbox" id="goboMove"></label>
+      </div>
+    </details>
+
+    <details class="group border-b border-neutral-800">
+      <summary class="flex justify-between items-center px-5 py-3.5 cursor-pointer select-none font-medium hover:bg-neutral-800/50 transition-colors">
+        <span>Ambiente e resa</span>
+        <i data-lucide="chevron-down" class="w-4 h-4 text-neutral-500 transition-transform group-open:-rotate-180"></i>
+      </summary>
+      <div class="px-5 pb-4 space-y-4">
+        <label class="field">Superficie
+          <select id="surface">
+            <option value="none">Nessuna (solo ombra)</option>
+            <option value="wood">Legno</option>
+            <option value="concrete">Cemento</option>
+            <option value="linen">Lino</option>
+            <option value="marble">Marmo</option>
+            <option value="paper">Carta</option>
+          </select>
+        </label>
+        <label class="field">Sfondo
+          <select id="bgMode">
+            <option value="solid">Tinta unita</option>
+            <option value="radial">Sfumato</option>
+            <option value="studio">Fondale da studio</option>
+          </select>
+        </label>
+        <label class="field">Colore di fondo <input type="color" class="color-input" id="cBg" value="#e9e7e3"></label>
+        <label class="field">Qualità
+          <select id="quality">
+            <option value="high">Alta (AO)</option>
+            <option value="draft">Bozza (veloce)</option>
+          </select>
+        </label>
+        <label class="field" title="Senza occlusione ambientale mentre l'animazione scorre; qualità piena in pausa e negli export">Anteprima veloce <input type="checkbox" id="fastPreview" checked></label>
+        <label class="field">Profondità di campo <input type="checkbox" id="dof"></label>
+        <div class="space-y-1">
+          <div class="flex justify-between items-center">
+            <label class="text-[10px] text-neutral-500" for="vignette">Vignettatura</label>
+            <span id="valVignette" class="text-[10px] font-mono tabular-nums text-neutral-400">0%</span>
+          </div>
+          <input type="range" id="vignette" min="0" max="100" value="0" class="w-full">
+        </div>
+        <div class="space-y-1">
+          <div class="flex justify-between items-center">
+            <label class="text-[10px] text-neutral-500" for="grain">Grana pellicola</label>
+            <span id="valGrain" class="text-[10px] font-mono tabular-nums text-neutral-400">0%</span>
+          </div>
+          <input type="range" id="grain" min="0" max="100" value="0" class="w-full">
+        </div>
+      </div>
+    </details>
+
+    <details class="group border-b border-neutral-800" open>
+      <summary class="flex justify-between items-center px-5 py-3.5 cursor-pointer select-none font-medium hover:bg-neutral-800/50 transition-colors">
+        <span id="exportTitle">Export · 1080 × 1440</span>
+        <i data-lucide="chevron-down" class="w-4 h-4 text-neutral-500 transition-transform group-open:-rotate-180"></i>
+      </summary>
+      <div class="px-5 pb-4 space-y-4">
+        <label class="field">Formato
+          <select id="format">
+            <option value="3:4">3:4 · 1080 × 1440</option>
+            <option value="4:5">4:5 · 1080 × 1350</option>
+            <option value="1:1">1:1 · 1080 × 1080</option>
+            <option value="9:16">9:16 · 1080 × 1920</option>
+            <option value="16:9">16:9 · 1920 × 1080</option>
+          </select>
+        </label>
+        <label class="field">Sfondo trasparente (PNG) <input type="checkbox" id="transparent"></label>
+        <button type="button" id="png" class="w-full flex items-center justify-center gap-2 bg-neutral-200 text-black py-2 rounded-md font-medium hover:bg-white transition-colors"><i data-lucide="download" class="w-4 h-4"></i>Salva PNG</button>
+        <label class="field">Fotogrammi al secondo
+          <select id="fps"><option value="24">24 fps</option><option value="30" selected>30 fps</option><option value="60">60 fps</option></select>
+        </label>
+        <label class="field">Qualità video
+          <select id="bitrate"><option value="8">Leggera · 8 Mbps</option><option value="16" selected>Alta · 16 Mbps</option><option value="40">Massima · 40 Mbps</option></select>
+        </label>
+        <label class="field" title="Ogni fotogramma è la media di più istanti: i movimenti veloci sfumano come in una ripresa vera">Motion blur
+          <select id="mblur"><option value="1">Nessuno</option><option value="4">Leggero</option><option value="8">Forte</option></select>
+        </label>
+        <label class="field">Risoluzione PNG
+          <select id="pngScale"><option value="1">1×</option><option value="2">2× (stampa)</option></select>
+        </label>
+        <label class="field">Durata video (s) <input type="number" id="secs" value="8" min="1" max="60"></label>
+        <button type="button" id="rec" class="w-full flex items-center justify-center gap-2 bg-neutral-200 text-black py-2 rounded-md font-medium hover:bg-white transition-colors"><i data-lucide="video" class="w-4 h-4"></i>Registra video</button>
+        <p class="status" id="exportStatus" role="status">Video al frame rate scelto, fotogramma per fotogramma, dall’inizio dell’animazione.</p>
+        <a id="lastExport" class="flex items-center gap-1.5 text-xs text-neutral-400 hover:text-neutral-200 underline underline-offset-2 transition-colors" hidden>Scarica il file</a>
+      </div>
+    </details>
+
+    <details class="group border-b border-neutral-800">
+      <summary class="flex justify-between items-center px-5 py-3.5 cursor-pointer select-none font-medium hover:bg-neutral-800/50 transition-colors">
+        <span>Progetto</span>
+        <i data-lucide="chevron-down" class="w-4 h-4 text-neutral-500 transition-transform group-open:-rotate-180"></i>
+      </summary>
+      <div class="px-5 pb-4 space-y-4">
+        <div class="grid grid-cols-2 gap-2">
+          <button type="button" id="saveProject" class="w-full flex items-center justify-center gap-2 border border-neutral-700 py-2 rounded-md hover:bg-neutral-800 transition-colors"><i data-lucide="save" class="w-4 h-4"></i>Salva</button>
+          <label class="w-full flex items-center justify-center gap-2 border border-neutral-700 py-2 rounded-md hover:bg-neutral-800 transition-colors cursor-pointer"><i data-lucide="folder-open" class="w-4 h-4"></i>Apri<input type="file" id="loadProject" accept="application/json,.json" class="hidden"></label>
+        </div>
+        <button type="button" id="resetAll" class="w-full flex items-center justify-center gap-2 border border-neutral-700 py-2 rounded-md hover:bg-neutral-800 transition-colors"><i data-lucide="eraser" class="w-4 h-4"></i>Ripristina tutto</button>
+        <p class="status">Le impostazioni restano salvate in questo browser. Il file di progetto non contiene PDF e immagini: vanno ricaricati.</p>
+        <p class="status">Scorciatoie: Spazio pausa · R ricomincia · ← → pagine · F reinquadra · P PNG · V video · [ ] fotogramma</p>
+      </div>
+    </details>
+  </div>
+</aside>
+</form>
+
+<div id="toast" class="fixed bottom-3.5 right-3.5 bg-neutral-800 border border-neutral-700 text-xs px-3 py-2 rounded-md z-50 pointer-events-none"></div>
+
+<script type="module" src="script.js?v=studio-5"></script>
+</body>
+</html>
